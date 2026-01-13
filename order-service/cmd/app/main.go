@@ -9,7 +9,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Wuchinator/food-delivery/order-service/internal/adapter/db/postgres"
+	"github.com/Wuchinator/food-delivery/order-service/internal/app/database"
+	"github.com/Wuchinator/food-delivery/order-service/internal/app/logger"
+	"github.com/Wuchinator/food-delivery/order-service/internal/config"
 	orderGrpc "github.com/Wuchinator/food-delivery/order-service/internal/handler/grpc"
+	"github.com/Wuchinator/food-delivery/order-service/internal/usecase"
 	pb "github.com/Wuchinator/food-delivery/order-service/pkg/order_v1"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -17,22 +22,52 @@ import (
 )
 
 func main() {
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal("Failed to load config", err)
+	}
+
+	log, err := logger.NewLogger(cfg.LogLevel, cfg.Environment)
+	if err != nil {
+		log.Fatal("Failed to init logger")
+	}
+
+	defer log.Sync()
+
+	log = logger.WithService(log, "order-service")
+
+	log.Info("Starting order service", zap.String("environment", cfg.Environment), zap.String("grpc port", cfg.GRPCPort))
+
+	db, err := database.NewConnection(database.Config{
+		DSN:             cfg.Postgres.PostgresDSN(),
+		MaxOpenConns:    cfg.Postgres.MaxOpenConns,
+		MaxIdleConns:    cfg.Postgres.MaxIdleConns,
+		MaxConnLifetime: cfg.Postgres.ConnMaxLifeTime,
+	}, log)
+
+	if err != nil {
+		log.Fatal("Failed to connect to database", zap.Error(err))
+	}
+
+	defer db.Close()
+
+	orderRepo := postgres.NewOrderRepository(db.Pool, log)
+	uc := usecase.NewCreateOrderUseCase(orderRepo, log)
 
 	grpcServer := grpc.NewServer()
-	orderHandler := orderGrpc.NewServer()
+	orderHandler := orderGrpc.NewServer(uc, log)
 
 	pb.RegisterOrderServiceServer(grpcServer, orderHandler)
 	reflection.Register(grpcServer)
 
-	listener, err := net.Listen("tcp", ":50051") // в будущем заменить на cfg.GRPCPort
+	listener, err := net.Listen("tcp", ":"+cfg.GRPCPort)
 
 	if err != nil {
 		log.Fatal("Error init grpc listener", zap.Error(err))
 	}
 
 	go func() {
-		// log.Info("Starting grpc server", zap.String("port", cfg.GRPCPort))
-		log.Println("Starting grpc server")
+		log.Info("Starting grpc server", zap.String("port", ":"+cfg.GRPCPort))
 		if err := grpcServer.Serve(listener); err != nil {
 			log.Fatal("Error init grpc server")
 		}
@@ -42,8 +77,7 @@ func main() {
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
 	<-quit
 
-	// log.Info("Shutting down grpc server")
-	log.Println("Shutting down grpc server")
+	log.Info("Shutting down grpc server")
 
 	stopped := make(chan struct{})
 	go func() {
@@ -56,14 +90,12 @@ func main() {
 
 	select {
 	case <-stopped:
-		// log.Info("GRPC server stopped")
-		log.Println("GRPC server stopped")
+		log.Info("GRPC server stopped")
 
 	case <-ctx.Done():
-		// log.Warn("shutdown grpc server timed out")
+		log.Warn("shutdown grpc server timed out")
 		grpcServer.Stop()
 	}
-	// log.Info("gRPC server stopped")
-	log.Println("GRPC server stopped")
+	log.Info("gRPC server stopped")
 
 }

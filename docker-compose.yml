@@ -6,6 +6,13 @@ services:
       context: ./order-service
       dockerfile: Dockerfile  
     container_name: order-service
+    ports:
+      - "50051:50051"
+    networks:
+      - delivery_network
+    depends_on:
+      postgres:
+        condition: service_healthy
   postgres:
     image: postgres:16-alpine
     container_name: postgres-main
@@ -19,8 +26,9 @@ services:
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./order-service/migrations:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d delivery"]
+      test: ["CMD-SHELL", "pg_isready -U user -d delivery"]
       interval: 15s
       timeout: 5s
       retries: 5
