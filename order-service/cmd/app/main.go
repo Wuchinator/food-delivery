@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Wuchinator/food-delivery/order-service/internal/adapter/db/postgres"
+	"github.com/Wuchinator/food-delivery/order-service/internal/adapter/kafka"
 	"github.com/Wuchinator/food-delivery/order-service/internal/app/database"
 	"github.com/Wuchinator/food-delivery/order-service/internal/app/logger"
 	"github.com/Wuchinator/food-delivery/order-service/internal/config"
@@ -31,12 +32,18 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to init logger")
 	}
-
 	defer log.Sync()
-
 	log = logger.WithService(log, "order-service")
-
 	log.Info("Starting order service", zap.String("environment", cfg.Environment), zap.String("grpc port", cfg.GRPCPort))
+
+	kafka := kafka.NewProducer(kafka.Config{
+		Brokers:         cfg.Kafka.Brokers,
+		Topic:           cfg.Kafka.Topic,
+		ProducerTimeout: cfg.Kafka.ProducerTimeout,
+		RequireAcks:     cfg.Kafka.RequireAcks,
+	}, log)
+
+	defer kafka.Close()
 
 	db, err := database.NewConnection(database.Config{
 		DSN:             cfg.Postgres.PostgresDSN(),
@@ -52,7 +59,7 @@ func main() {
 	defer db.Close()
 
 	orderRepo := postgres.NewOrderRepository(db.Pool, log)
-	uc := usecase.NewCreateOrderUseCase(orderRepo, log)
+	uc := usecase.NewCreateOrderUseCase(orderRepo, log, kafka)
 
 	grpcServer := grpc.NewServer()
 	orderHandler := orderGrpc.NewServer(uc, log)

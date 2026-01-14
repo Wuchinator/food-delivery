@@ -30,18 +30,16 @@ type PostgresConfig struct {
 }
 
 type KafkaConfig struct {
-	Brokers          []string
-	Topic            string
-	ProducerRetries  int
-	ProducerTimeout  time.Duration
-	RequireAcks      int
-	CompressionType  string
-	MaxMessageByte   int
-	IdempotentWrites bool
+	Brokers         []string
+	Topic           string
+	ProducerTimeout time.Duration
+	RequireAcks     int
 }
 
 func Load() (*Config, error) {
-	_ = godotenv.Load()
+	if os.Getenv("ENVIRONMENT") != "production" {
+		_ = godotenv.Load()
+	}
 
 	cfg := &Config{
 		Environment: getEnv("ENVIRONMENT", "development"),
@@ -63,14 +61,10 @@ func Load() (*Config, error) {
 
 	brokers := getEnv("KAFKA_BROKERS", "localhost:9092")
 	cfg.Kafka = KafkaConfig{
-		Brokers:          strings.Split(brokers, ","),
-		Topic:            getEnv("KAFKA_TOPIC_ORDER", "user-order"),
-		ProducerRetries:  getEnvAsInt("KAFKA_PRODUCER_RETRIES", 3),
-		ProducerTimeout:  getEnvAsDuration("KAFKA_PRODUCER_TIMEOUT", time.Second*15),
-		RequireAcks:      getEnvAsInt("KAFKA_REQUIRED_ACKS", -1),
-		CompressionType:  getEnv("KAFKA_COMPRESSION", "snappy"),
-		MaxMessageByte:   getEnvAsInt("KAFKA_MAX_MESSAGE_BYTES", 1000000),
-		IdempotentWrites: getEnvAsBool("KAFKA_IDEMPOTENT_WRITES", true),
+		Brokers:         strings.Split(brokers, ","),
+		Topic:           getEnv("KAFKA_TOPIC_ORDER", "user-order"),
+		ProducerTimeout: getEnvAsDuration("KAFKA_PRODUCER_TIMEOUT", time.Second*15),
+		RequireAcks:     getEnvAsInt("KAFKA_REQUIRED_ACKS", -1),
 	}
 
 	return cfg, nil
@@ -98,14 +92,6 @@ func getEnv(key, defaultValue string) string {
 func getEnvAsInt(key string, defaultValue int) int {
 	valueStr := os.Getenv(key)
 	if value, err := strconv.Atoi(valueStr); err == nil {
-		return value
-	}
-	return defaultValue
-}
-
-func getEnvAsBool(key string, defaultValue bool) bool {
-	valueStr := os.Getenv(key)
-	if value, err := strconv.ParseBool(valueStr); err == nil {
 		return value
 	}
 	return defaultValue

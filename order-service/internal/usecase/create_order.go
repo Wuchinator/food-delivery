@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"time"
 
+	"github.com/Wuchinator/food-delivery/order-service/internal/adapter/kafka"
 	"github.com/Wuchinator/food-delivery/order-service/internal/domain"
 	"go.uber.org/zap"
 )
@@ -22,25 +24,30 @@ type CreateOrderItemInput struct {
 	Quantity  int32
 }
 
+type KafkaProducer interface {
+	SentOrCreated(ctx context.Context, event kafka.OrderCreatedEvent) error
+}
+
 // Strcut of dependecies
 type CreateOrderUseCase struct {
 	repo   domain.OrderRepository
 	logger *zap.Logger
-	// ... kafka producer
+	kafka  KafkaProducer
 }
 
-func NewCreateOrderUseCase(repo domain.OrderRepository, logger *zap.Logger) *CreateOrderUseCase {
+func NewCreateOrderUseCase(repo domain.OrderRepository, logger *zap.Logger, kafka KafkaProducer) *CreateOrderUseCase {
 	return &CreateOrderUseCase{
 		repo:   repo,
 		logger: logger,
+		kafka:  kafka,
 	}
 }
 
 func (uc *CreateOrderUseCase) Exec(ctx context.Context, input CreateOrderInput) (int64, error) {
 
 	if len(input.Items) == 0 {
-		uc.logger.Error("goods can not be 0")
-		return 0, errors.New("goods can not be 0")
+		uc.logger.Error("goods can not be empty")
+		return 0, errors.New("goods can not be empty")
 	}
 
 	orderItems := make([]domain.OrderItem, 0, len(input.Items))
@@ -66,5 +73,20 @@ func (uc *CreateOrderUseCase) Exec(ctx context.Context, input CreateOrderInput) 
 		return 0, fmt.Errorf("Failed to create order %w", err)
 	}
 
-	return orderID, nil
+	order.ID = orderID
+
+	event := kafka.OrderCreatedEvent{
+		OrderID:   order.ID,
+		UserID:    order.UserID,
+		Timestamp: time.Now(),
+	}
+
+	err = uc.kafka.SentOrCreated(ctx, event)
+	if err != nil {
+		uc.logger.Error("order created, but failed to send kafka event",
+			zap.Int64("ID", order.ID),
+			zap.Error(err))
+	}
+
+	return order.ID, nil
 }

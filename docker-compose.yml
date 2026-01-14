@@ -1,39 +1,59 @@
-version: "3.9"
-
-services:
+services: # Do patter data base per service
   order-service:
     build:
       context: ./order-service
-      dockerfile: Dockerfile  
+      dockerfile: Dockerfile
+    env_file:
+      - ./order-service/.env  
     container_name: order-service
     ports:
       - "50051:50051"
     networks:
       - delivery_network
     depends_on:
-      postgres:
+      postgres-orders:
         condition: service_healthy
-  postgres:
+  postgres-orders:
     image: postgres:16-alpine
-    container_name: postgres-main
+    container_name: postgres-orders
     environment:
       POSTGRES_DB: delivery
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
+      POSTGRES_USER: user_orders
+      POSTGRES_PASSWORD: password_orders
 
     ports:
       - "5432:5432"
 
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./order-service/migrations:/docker-entrypoint-initdb.d
+      - postgres_orders_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d delivery"]
+      test: ["CMD-SHELL", "pg_isready -h localhost -U user_orders -d delivery"]
       interval: 15s
       timeout: 5s
       retries: 5
     networks:
       - delivery_network
+
+  postgres-restaurants:
+    image: postgres:16-alpine
+    container_name: postgres-restaurants
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: restaurants
+      POSTGRES_USER: user_restaurants
+      POSTGRES_PASSWORD: password_restaurants
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -U user_restaurants -d restaurants"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - delivery_network
+    volumes:
+      - postgres_restaurants_data:/var/lib/postgresql/data
+
+    #...
   redis:
     image: redis:8-alpine
     container_name: redis
@@ -41,6 +61,8 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    networks:
+      - delivery_network
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: zookeeper
@@ -86,10 +108,10 @@ services:
     volumes:
       - kafka_data:/var/lib/kafka/data
     healthcheck:
-      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
-      interval: 10s
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "kafka:29092"]
+      interval: 15s
       timeout: 10s
-      retries: 5
+      retries: 10
     networks:
       - delivery_network
 
@@ -109,7 +131,9 @@ services:
       - delivery_network
       
 volumes:
-  postgres_data:
+  postgres_orders_data:
+    driver: local
+  postgres_restaurants_data:
     driver: local
   redis_data:
     driver: local
