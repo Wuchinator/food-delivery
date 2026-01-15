@@ -11,11 +11,12 @@ import (
 )
 
 type Config struct {
-	Environment string
-	LogLevel    string
-	GRPCPort    string
-	Postgres    PostgresConfig
-	Kafka       KafkaConfig
+	Environment    string
+	LogLevel       string
+	GRPCPort       string
+	PrometheusPort string
+	Postgres       PostgresConfig
+	Kafka          KafkaConfig
 }
 type PostgresConfig struct {
 	Host            string
@@ -42,9 +43,10 @@ func Load() (*Config, error) {
 	}
 
 	cfg := &Config{
-		Environment: getEnv("ENVIRONMENT", "development"),
-		LogLevel:    getEnv("LOG_LEVEL", "info"),
-		GRPCPort:    getEnv("ORDER_SERVICE_PORT", "50051"),
+		Environment:    getEnv("ENVIRONMENT", "development"),
+		LogLevel:       getEnv("LOG_LEVEL", "info"),
+		GRPCPort:       getEnv("ORDER_SERVICE_PORT", "50051"),
+		PrometheusPort: getEnv("PROMETHEUS_PORT", "9090"),
 	}
 
 	cfg.Postgres = PostgresConfig{

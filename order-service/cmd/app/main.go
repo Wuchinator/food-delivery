@@ -1,24 +1,22 @@
 package main
 
 import (
-	"context"
 	"log"
-	"net"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/Wuchinator/food-delivery/order-service/internal/adapter/db/postgres"
 	"github.com/Wuchinator/food-delivery/order-service/internal/adapter/kafka"
+	"github.com/Wuchinator/food-delivery/order-service/internal/app"
 	"github.com/Wuchinator/food-delivery/order-service/internal/app/database"
 	"github.com/Wuchinator/food-delivery/order-service/internal/app/logger"
 	"github.com/Wuchinator/food-delivery/order-service/internal/config"
 	orderGrpc "github.com/Wuchinator/food-delivery/order-service/internal/handler/grpc"
 	"github.com/Wuchinator/food-delivery/order-service/internal/usecase"
 	pb "github.com/Wuchinator/food-delivery/order-service/pkg/order_v1"
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -58,51 +56,23 @@ func main() {
 
 	defer db.Close()
 
+	grpcServer := grpc.NewServer(
+		grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
+		grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor),
+		grpc.KeepaliveParams(keepalive.ServerParameters{
+			MaxConnectionIdle: 5 * time.Minute,
+			Timeout:           20 * time.Second,
+		}),
+	)
+
+	grpc_prometheus.Register(grpcServer)
+
 	orderRepo := postgres.NewOrderRepository(db.Pool, log)
 	uc := usecase.NewCreateOrderUseCase(orderRepo, log, kafka)
-
-	grpcServer := grpc.NewServer()
 	orderHandler := orderGrpc.NewServer(uc, log)
-
 	pb.RegisterOrderServiceServer(grpcServer, orderHandler)
 	reflection.Register(grpcServer)
 
-	listener, err := net.Listen("tcp", ":"+cfg.GRPCPort)
-
-	if err != nil {
-		log.Fatal("Error init grpc listener", zap.Error(err))
-	}
-
-	go func() {
-		log.Info("Starting grpc server", zap.String("port", ":"+cfg.GRPCPort))
-		if err := grpcServer.Serve(listener); err != nil {
-			log.Fatal("Error init grpc server")
-		}
-	}()
-
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
-	<-quit
-
-	log.Info("Shutting down grpc server")
-
-	stopped := make(chan struct{})
-	go func() {
-		grpcServer.GracefulStop()
-		close(stopped)
-	}()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	select {
-	case <-stopped:
-		log.Info("GRPC server stopped")
-
-	case <-ctx.Done():
-		log.Warn("shutdown grpc server timed out")
-		grpcServer.Stop()
-	}
-	log.Info("gRPC server stopped")
-
+	App := app.NewApp(cfg, log, grpcServer)
+	App.Run()
 }

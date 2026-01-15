@@ -129,6 +129,30 @@ services: # Do patter data base per service
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
     networks:
       - delivery_network
+  prometheus:
+    image: prom/prometheus:v2.47.2
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    command: 
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    networks:
+      - delivery_network
+  grafana:
+    image: grafana/grafana-oss:10.2.2
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    networks:
+      - delivery_network
+    depends_on:
+      - prometheus
       
 volumes:
   postgres_orders_data:
@@ -142,6 +166,8 @@ volumes:
   zookeeper_logs:
     driver: local
   kafka_data:
+    driver: local
+  grafana_data:
     driver: local
 
 networks:
