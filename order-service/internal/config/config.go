@@ -1,5 +1,7 @@
 package config
 
+// TODO: Разнести на файлы оставив лишь интерфейс для подключения
+
 import (
 	"fmt"
 	"os"
@@ -24,8 +26,8 @@ type PostgresConfig struct {
 	Database        string
 	User            string
 	Password        string
-	MaxOpenConns    int // as more as possible
-	MaxIdleConns    int // as less as possible
+	MaxOpenConns    int
+	MaxIdleConns    int
 	ConnMaxLifeTime time.Duration
 	SSLMode         string
 }

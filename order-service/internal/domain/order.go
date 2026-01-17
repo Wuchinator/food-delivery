@@ -32,7 +32,6 @@ type OrderItem struct {
 type OrderRepository interface {
 	Create(ctx context.Context, order *Order) (int64, error)
 	GetByID(ctx context.Context, id int64) (*Order, error)
-	// ...
 }
 
 func NewOrder(userID, restaurantID int64, items []OrderItem) (*Order, error) { // Пока без проверок

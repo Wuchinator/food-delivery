@@ -33,7 +33,7 @@ func NewProducer(cfg Config, logger *zap.Logger) *Producer {
 	writer := &kafka.Writer{
 		Addr:         kafka.TCP(cfg.Brokers...),
 		Topic:        cfg.Topic,
-		Balancer:     &kafka.CRC32Balancer{},
+		Balancer:     &kafka.RoundRobin{},
 		WriteTimeout: cfg.ProducerTimeout,
 		RequiredAcks: kafka.RequiredAcks(cfg.RequireAcks),
 	}
