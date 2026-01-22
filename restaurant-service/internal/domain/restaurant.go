@@ -1,49 +1,26 @@
 package domain
 
-import (
-	"context"
-	"time"
-)
+import "context"
+
+type Restaurant struct {
+	ID      int64
+	Name    string
+	Address string
+}
+
+type MenuItem struct {
+	ID           int64
+	ProductID    int64
+	RestaurantID int64
+	Price        int64
+	Name         string
+	Description  string
+	IsAvailable  bool
+}
 
 type RestaurantRepository interface {
-	Create(ctx context.Context, restaurantOrders *RestaurantOrders) (int64, error)
-	Read(ctx context.Context, ID int64) (bool, error)
-}
-type orderStatus string
-
-const (
-	Accepted  orderStatus = "Accepted"
-	Ready     orderStatus = "Ready"
-	Cancelled orderStatus = "Cancelled"
-)
-
-type RestaurantOrders struct {
-	ID            int64
-	OrderID       int64
-	RestaurantIdD int64
-	Status        orderStatus
-	Items         []RestaurantOrderItems
-	CreatedAt     time.Time
-	AcceptedAt    time.Time
-	ReadyAt       time.Time
-	CancelledAt   time.Time
-	UpdatedAt     time.Time
-}
-
-type RestaurantOrderItems struct {
-	ProductID int64
-	Quantity  int32
-	Price     int64
-}
-
-func NewRestaurantOrders(OrderID, RestaurantID int64, status orderStatus, items []RestaurantOrderItems) *RestaurantOrders {
-	now := time.Now()
-	return &RestaurantOrders{
-		OrderID:       OrderID,
-		RestaurantIdD: RestaurantID,
-		Status:        status,
-		Items:         items,
-		CreatedAt:     now,
-		UpdatedAt:     now,
-	}
+	GetMenu(ctx context.Context, restaurantID int64) ([]MenuItem, error)
+	UpdateMenu(ctx context.Context, item *MenuItem) error
+	CreateMenuItem(ctx context.Context, Menu *MenuItem) (int64, error)
+	DeleteMenu(ctx context.Context, restaurantID int64, itemID int64) error
 }

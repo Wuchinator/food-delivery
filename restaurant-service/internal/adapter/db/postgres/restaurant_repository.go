@@ -1,4 +1,4 @@
-package database
+package postgres
 
 import (
 	"context"
@@ -20,16 +20,46 @@ func NewRestaurantRepository(pool *pgxpool.Pool, logger *zap.Logger) *Restaurant
 	}
 }
 
-func (r *RestaurantRepository) Create(ctx context.Context, restaurantOrders *domain.RestaurantOrders) (int64, error) {
-	_, err := r.pool.Begin(ctx)
+func (r *RestaurantRepository) CreateMenuItem(ctx context.Context, Menu *domain.MenuItem) (int64, error) {
+	tx, err := r.pool.Begin(ctx)
 	if err != nil {
-		r.logger.Error("Failed to start transaction", zap.Error(err))
+		r.logger.Error("Failed to begin transaction", zap.Error(err))
+		return 0, err
+	}
+	defer tx.Rollback(ctx)
+
+	query := `INSERT INTO menu (restaurant_id, product_id, name, price, description, is_available)
+	 VALUES ($1, $2, $3, $4, $5, $6)
+	 RETURNING id`
+
+	var MenuID int64
+
+	err = tx.QueryRow(ctx, query,
+		Menu.RestaurantID, Menu.ProductID, Menu.Name,
+		Menu.Price, Menu.Description, Menu.IsAvailable).Scan(&MenuID)
+
+	if err != nil {
+		r.logger.Error("Failed to insert data in menu", zap.Error(err))
 		return 0, err
 	}
 
-	//query := `INSERT INTO restaurant_orders VALUES ($1 $2 $3)`
-	return 0, nil
+	err = tx.Commit(ctx)
+	if err != nil {
+		r.logger.Error("Failed to commit transaction", zap.Error(err))
+		return 0, err
+	}
+
+	return MenuID, nil
 }
-func (r *RestaurantRepository) Read(ctx context.Context, ID int64) (bool, error) {
-	return false, nil
+
+func (r *RestaurantRepository) GetMenu(ctx context.Context, restaurantID int64) ([]domain.MenuItem, error) {
+	return nil, nil
+}
+
+func (r *RestaurantRepository) UpdateMenu(ctx context.Context, item *domain.MenuItem) error {
+	return nil
+}
+
+func (r *RestaurantRepository) DeleteMenu(ctx context.Context, restaurantID int64, itemID int64) error {
+	return nil
 }

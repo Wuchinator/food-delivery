@@ -1,0 +1,39 @@
+syntax="proto3";
+
+package restaurant_v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/Wuchinator/food-delivery/restaurant-service/pkg/restaurant_v1;restaurant_v1";
+
+service RestaurantService {
+  rpc GetMenu(GetMenuRequest) returns (GetMenuResponse);
+  rpc UpdateMenuItem(UpdateMenuItemRequest) returns (UpdateMenuItemResponse);
+}
+
+message GetMenuRequest {
+  int64 restaurant_id = 1;
+}
+
+message GetMenuResponse {
+  repeated MenuItem items = 1;
+}
+
+message MenuItem {
+  int64 product_id = 1;
+  string name = 2;
+  string description = 3;
+  int64 price = 4;
+}
+
+message UpdateMenuItemRequest {
+  int64 restaurant_id = 1;
+  int64 product_id = 2;
+  optional int64 new_price = 3;
+  optional string new_description = 4;
+}
+
+message UpdateMenuItemResponse {
+  bool success = 1;
+  google.protobuf.Timestamp updated_at = 2;
+}
